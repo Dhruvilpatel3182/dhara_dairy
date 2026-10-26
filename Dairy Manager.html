@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dairy Manager</title>
+<style>
+:root{--bg:#f3f6f1;--sf:#fff;--tx:#1d2a22;--mu:#5d6b62;--ac:#1f6f50;--ac2:#e8f2ec;--bd:#d5ded6;--wa:#b45309;--wb:#fdf0dc;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121a15;--sf:#1b261f;--tx:#e6efe8;--mu:#9bab9f;--ac:#5fc79a;--ac2:#22382b;--bd:#2f4034;--wa:#f0b35a;--wb:#3a2f1a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121a15;--sf:#1b261f;--tx:#e6efe8;--mu:#9bab9f;--ac:#5fc79a;--ac2:#22382b;--bd:#2f4034;--wa:#f0b35a;--wb:#3a2f1a;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;margin:0 0 .5rem;font-weight:700}
+h2{font-size:1.35rem}h3{font-size:1.05rem}
+main{max-width:1000px;margin:0 auto;padding:1rem}
+header{display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;padding:.75rem 1rem;background:var(--ac);color:#fff}
+header b{font-family:Georgia,serif;font-size:1.2rem}
+header button{background:transparent;color:#fff;border:1px solid #ffffff88}
+.card{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:1rem;margin-bottom:1rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.75rem;margin-bottom:1rem}
+.stat{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:.75rem}
+.stat b{display:block;font-size:1.5rem;font-family:Georgia,serif;color:var(--ac)}
+.stat span,.m{color:var(--mu);font-size:.9rem}
+label{display:block;font-size:.9rem;color:var(--mu);margin-bottom:.6rem}
+input,select{display:block;width:100%;padding:.5rem;margin-top:.2rem;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem}
+button{padding:.5rem .9rem;border-radius:6px;border:0;background:var(--ac);color:#fff;font:inherit;cursor:pointer}
+button.s{background:var(--ac2);color:var(--ac)}button.d{background:var(--wb);color:var(--wa)}
+button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:3px solid var(--wa);outline-offset:2px}
+.sc{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.92rem}
+th,td{text-align:left;padding:.45rem .5rem;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{color:var(--mu);font-weight:600}
+.pill{padding:.1rem .55rem;border-radius:99px;background:var(--ac2);color:var(--ac);font-size:.8rem}
+.pill.w{background:var(--wb);color:var(--wa)}
+a{color:var(--ac)}
+.tabs{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const K='dairy_v1';let S=null,U=null,F='all',AS=null;
+const seed={fac:[{id:'f1',name:'Main Dairy',loc:'Wardha'}],prod:[{id:'p1',name:'Milk 1L',per:12,price:60},{id:'p2',name:'Curd 500g',per:20,price:40}],ord:[]};
+try{S=JSON.parse(localStorage.getItem(K))}catch(e){}
+if(!S||!S.ord)S=JSON.parse(JSON.stringify(seed));
+const save=()=>{try{localStorage.setItem(K,JSON.stringify(S))}catch(e){}};
+const $=id=>document.getElementById(id),uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const P=id=>S.prod.find(p=>p.id===id)||{name:'(deleted)',per:1,price:0};
+const FN=id=>(S.fac.find(f=>f.id===id)||{name:'(deleted)'}).name;
+const pcs=o=>o.crates*P(o.pid).per+o.qty;
+const inr=n=>'₹'+Number(n).toLocaleString('en-IN');
+const today=()=>new Date().toISOString().slice(0,10);
+const dt=s=>s?new Date(s).toLocaleString():'—';
+const desc=o=>o.crates+' crate'+(o.qty?' + '+o.qty+' pcs':'');
+const pill=s=>'<span class="pill'+(s==='Pending'?' w':'')+'">'+s+'</span>';
+const same=(a,b)=>String(a||'').trim().toLowerCase()===String(b||'').trim().toLowerCase();
+
+function grp(os,fn){const g={};os.forEach(o=>{const k=fn(o),x=g[k]||(g[k]={n:0,c:0,p:0,a:0});x.n++;x.c+=o.crates;x.p+=pcs(o);x.a+=o.amount});return g}
+function sumTable(g,h){const ks=Object.keys(g).sort().reverse();if(!ks.length)return'<p class="m">No orders yet.</p>';
+return'<div class="sc"><table><tr><th>'+h+'</th><th>Orders</th><th>Crates ordered</th><th>Total pieces</th><th>Amount</th></tr>'+ks.map(k=>'<tr><td>'+k+'</td><td>'+g[k].n+'</td><td>'+g[k].c+'</td><td>'+g[k].p+'</td><td>'+inr(g[k].a)+'</td></tr>').join('')+'</table></div>'}
+
+function render(){
+ if(!U){$('app').innerHTML='<main><div class="card" style="max-width:420px;margin:3rem auto"><h1>Dairy Manager</h1><p class="m">Sign in to manage orders, deliveries and sales.</p><label>Role<select id="lr"><option value="admin">Super admin</option><option value="owner">Owner</option><option value="trans">Transporter</option><option value="buyer">Buyer</option></select></label><label>Your name<input id="ln" placeholder="Needed for transporter and buyer"></label><button onclick="login()">Sign in</button><p class="m">Transporters and buyers see only orders that carry the same name the owner typed.</p></div></main>';return}
+ const t={admin:'Super admin',owner:'Owner',trans:'Transporter',buyer:'Buyer'}[U.role];
+ $('app').innerHTML='<header><b>Dairy Manager</b><span>'+t+(U.name?' · '+esc(U.name):'')+'</span><button onclick="U=null;AS=null;render()">Sign out</button></header><main>'+({admin,owner,trans,buyer}[U.role])()+'</main>';
+}
+function login(){const r=$('lr').value,n=$('ln').value.trim();if((r==='trans'||r==='buyer')&&!n){alert('Enter your name to continue.');return}U={role:r,name:n};render()}
+
+function admin(){
+ const tot=S.ord.reduce((a,o)=>a+o.amount,0);
+ return'<h2>All facilities</h2><div class="grid"><div class="stat"><b>'+S.fac.length+'</b><span>Facilities</span></div><div class="stat"><b>'+S.prod.length+'</b><span>Products</span></div><div class="stat"><b>'+S.ord.length+'</b><span>Orders, all facilities</span></div><div class="stat"><b>'+inr(tot)+'</b><span>Total sales</span></div></div>'+
+ '<div class="card"><h3>Add facility</h3><div class="row"><label>Name<input id="fn"></label><label>Location<input id="fl"></label></div><button onclick="addFac()">Add facility</button></div>'+
+ '<div class="card sc"><table><tr><th>Facility</th><th>Location</th><th>Orders</th><th>Sales</th><th></th></tr>'+S.fac.map(f=>{const os=S.ord.filter(o=>o.fid===f.id);return'<tr><td>'+esc(f.name)+'</td><td>'+esc(f.loc)+'</td><td>'+os.length+'</td><td>'+inr(os.reduce((a,o)=>a+o.amount,0))+'</td><td><button class="d" onclick="delFac(\''+f.id+'\')">Remove</button></td></tr>'}).join('')+'</table></div>'+
+ '<div class="card"><h3>Add product</h3><div class="row"><label>Name<input id="pn"></label><label>Pieces in one crate<input id="pp" type="number" min="1"></label><label>Price per piece (₹)<input id="pr" type="number" min="0"></label></div><button onclick="addProd()">Add product</button></div>'+
+ '<div class="card sc"><table><tr><th>Product</th><th>Pieces per crate</th><th>Price per piece</th><th>Price per crate</th><th></th></tr>'+S.prod.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+p.per+'</td><td>'+inr(p.price)+'</td><td>'+inr(p.per*p.price)+'</td><td><button class="d" onclick="delProd(\''+p.id+'\')">Remove</button></td></tr>').join('')+'</table></div>'}
+function addFac(){const n=$('fn').value.trim();if(!n){alert('Enter a facility name.');return}S.fac.push({id:uid(),name:n,loc:$('fl').value.trim()});save();render()}
+function delFac(id){if(confirm('Remove this facility? Its orders stay in the records.')){S.fac=S.fac.filter(f=>f.id!==id);save();render()}}
+function addProd(){const n=$('pn').value.trim(),pp=+$('pp').value,pr=+$('pr').value;if(!n||pp<1||pr<0){alert('Enter a name, pieces per crate and a price.');return}S.prod.push({id:uid(),name:n,per:pp,price:pr});save();render()}
+function delProd(id){if(confirm('Remove this product?')){S.prod=S.prod.filter(p=>p.id!==id);save();render()}}
+
+function owner(){
+ const os=S.ord.filter(o=>F==='all'||o.fid===F),td=today(),mo=td.slice(0,7);
+ const dayS=os.filter(o=>o.date===td),moS=os.filter(o=>o.date.startsWith(mo));
+ const a=x=>x.reduce((s,o)=>s+o.amount,0);
+ let h='<h2>Owner dashboard</h2><label style="max-width:300px">Facility<select onchange="F=this.value;render()"><option value="all">All facilities</option>'+S.fac.map(f=>'<option value="'+f.id+'"'+(F===f.id?' selected':'')+'>'+esc(f.name)+'</option>').join('')+'</select></label>';
+ h+='<div class="grid"><div class="stat"><b>'+dayS.length+'</b><span>Orders today</span></div><div class="stat"><b>'+inr(a(dayS))+'</b><span>Sales today</span></div><div class="stat"><b>'+moS.length+'</b><span>Orders this month</span></div><div class="stat"><b>'+inr(a(moS))+'</b><span>Sales this month</span></div></div>';
+ h+='<div class="card"><h3>New order</h3><div class="row"><label>Customer name<input id="oc"></label><label>Date<input id="od" type="date" value="'+td+'"></label><label>Facility<select id="of">'+S.fac.map(f=>'<option value="'+f.id+'">'+esc(f.name)+'</option>').join('')+'</select></label><label>Product<select id="op">'+S.prod.map(p=>'<option value="'+p.id+'">'+esc(p.name)+' ('+p.per+' per crate)</option>').join('')+'</select></label><label>Crates<input id="ocr" type="number" min="0" value="0"></label><label>Loose pieces<input id="oq" type="number" min="0" value="0"></label></div><button onclick="addOrd()">Save order</button></div>';
+ if(AS){const o=S.ord.find(x=>x.id===AS);if(o)h+='<div class="card"><h3>Assign transport for '+esc(o.customer)+'</h3><div class="row"><label>Transporter name<input id="at" value="'+esc(o.transporter)+'"></label><label>Delivery location<input id="al" value="'+esc(o.loc)+'" placeholder="Address or place"></label><label>Delivery time<input id="atm" type="datetime-local" value="'+esc(o.time)+'"></label></div><button onclick="assign()">Save assignment</button> <button class="s" onclick="AS=null;render()">Cancel</button></div>'}
+ h+='<div class="card"><h3>Orders</h3><div class="sc">'+(os.length?'<table><tr><th>Date</th><th>Customer</th><th>Facility</th><th>Product</th><th>Ordered</th><th>Pieces</th><th>Amount</th><th>Status</th><th>Transporter</th><th>Received</th><th></th></tr>'+os.slice().reverse().map(o=>'<tr><td>'+o.date+'</td><td>'+esc(o.customer)+'</td><td>'+esc(FN(o.fid))+'</td><td>'+esc(P(o.pid).name)+'</td><td>'+desc(o)+'</td><td>'+pcs(o)+'</td><td>'+inr(o.amount)+'</td><td>'+pill(o.status)+'</td><td>'+esc(o.transporter||'—')+'</td><td>'+(o.recC!=null?o.recC+' crate + '+o.recQ+' pcs':'—')+'</td><td><button class="s" onclick="AS=\''+o.id+'\';render()">Assign</button></td></tr>').join('')+'</table>':'<p class="m">No orders yet. Save your first order above.</p>')+'</div></div>';
+ h+='<div class="card"><h3>Sales by day</h3>'+sumTable(grp(os,o=>o.date),'Day')+'</div><div class="card"><h3>Sales by month</h3>'+sumTable(grp(os,o=>o.date.slice(0,7)),'Month')+'</div>';
+ h+='<div class="card"><h3>Sales by product</h3>'+sumTable(grp(os,o=>P(o.pid).name),'Product')+'</div><div class="card"><h3>Sales by customer</h3>'+sumTable(grp(os,o=>o.customer),'Customer')+'</div>';
+ return h}
+function addOrd(){const c=$('oc').value.trim(),cr=Math.max(0,+$('ocr').value||0),q=Math.max(0,+$('oq').value||0),pid=$('op').value,fid=$('of').value;
+ if(!c||!pid||!fid||cr+q<1){alert('Enter a customer, a facility, a product and at least one crate or piece.');return}
+ const p=P(pid);S.ord.push({id:uid(),date:$('od').value||today(),customer:c,fid,pid,crates:cr,qty:q,amount:(cr*p.per+q)*p.price,status:'Pending',transporter:'',loc:'',time:'',recC:null,recQ:null});save();render()}
+function assign(){const o=S.ord.find(x=>x.id===AS);const t=$('at').value.trim(),l=$('al').value.trim();if(!t||!l){alert('Enter a transporter and a delivery location.');return}
+ o.transporter=t;o.loc=l;o.time=$('atm').value;if(o.status==='Pending')o.status='Assigned';AS=null;save();render()}
+
+function trans(){
+ const os=S.ord.filter(o=>same(o.transporter,U.name));
+ return'<h2>My deliveries</h2>'+(os.length?'<div class="card sc"><table><tr><th>Customer</th><th>Product</th><th>Load</th><th>Location</th><th>Time</th><th>Status</th><th></th></tr>'+os.slice().reverse().map(o=>'<tr><td>'+esc(o.customer)+'</td><td>'+esc(P(o.pid).name)+'</td><td>'+desc(o)+'</td><td>'+esc(o.loc)+'</td><td>'+dt(o.time)+'</td><td>'+pill(o.status)+'</td><td><a href="https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(o.loc)+'" target="_blank" rel="noopener">Get directions</a> '+(o.status==='Assigned'?'<button onclick="deliver(\''+o.id+'\')">Mark delivered</button>':'')+'</td></tr>').join('')+'</table></div>':'<div class="card"><p class="m">Nothing assigned to “'+esc(U.name)+'” yet. Ask the owner to use this exact name when assigning transport.</p></div>')}
+function deliver(id){const o=S.ord.find(x=>x.id===id);o.status='Delivered';o.deliveredAt=new Date().toISOString();save();render()}
+
+function buyer(){
+ const os=S.ord.filter(o=>same(o.customer,U.name));
+ return'<h2>My orders</h2>'+(os.length?os.slice().reverse().map(o=>'<div class="card"><h3>'+esc(P(o.pid).name)+' · '+desc(o)+' '+pill(o.status)+'</h3><p class="m">Ordered '+o.date+' · '+pcs(o)+' pieces · '+inr(o.amount)+(o.transporter?' · Transporter: '+esc(o.transporter):'')+(o.time?' · Arrives '+dt(o.time):'')+'</p>'+
+ (o.status==='Delivered'?'<div class="row"><label>Crates received<input id="rc'+o.id+'" type="number" min="0" value="'+o.crates+'"></label><label>Loose pieces received<input id="rq'+o.id+'" type="number" min="0" value="'+o.qty+'"></label></div><button onclick="collect(\''+o.id+'\')">Confirm what I received</button>':'')+
+ (o.recC!=null?'<p>You received '+o.recC+' crate + '+o.recQ+' pcs ('+(o.recC*P(o.pid).per+o.recQ)+' pieces).'+((o.recC*P(o.pid).per+o.recQ)!==pcs(o)?' <span class="pill w">Differs from order</span>':'')+'</p>':'')+'</div>').join(''):'<div class="card"><p class="m">No orders found for “'+esc(U.name)+'”. Use the same name the owner entered on your order.</p></div>')}
+function collect(id){const o=S.ord.find(x=>x.id===id);o.recC=Math.max(0,+$('rc'+id).value||0);o.recQ=Math.max(0,+$('rq'+id).value||0);o.status='Collected';o.collectedAt=new Date().toISOString();save();render()}
+render();
+</script>
+</body>
+</html>
